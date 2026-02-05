@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<title>Consulta de Escala por RE</title>
+
+<style>
+body {
+  margin: 0;
+  padding: 0;
+  background: #0f0f0f;
+  color: #e0e0e0;
+  font-family: "Segoe UI", Tahoma, sans-serif;
+}
+
+.container {
+  max-width: 900px;
+  margin: 80px auto;
+  padding: 0 20px;
+  text-align: center;
+}
+
+h1 {
+  color: #1e88ff;
+  margin-bottom: 30px;
+}
+
+input {
+  width: 100%;
+  padding: 14px 18px;
+  font-size: 16px;
+  border-radius: 10px;
+  border: 1px solid #333;
+  background: #1a1a1a;
+  color: #fff;
+}
+
+.resultado {
+  margin-top: 30px;
+  padding: 20px;
+  border-radius: 12px;
+  font-size: 18px;
+  display: none;
+}
+
+.encontrado {
+  background: rgba(30,136,255,0.15);
+  border: 1px solid #1e88ff;
+}
+
+.nao-encontrado {
+  background: rgba(255,70,70,0.15);
+  border: 1px solid #ff4d4d;
+  color: #ffb3b3;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <h1>Consulta de Escala</h1>
+
+  <input
+    type="text"
+    id="reInput"
+    placeholder="Digite o RE (ex: 155.666-9)"
+  >
+
+  <div id="resultado" class="resultado"></div>
+</div>
+
+<script>
+const CSV_URL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vStjOw-tr--fHNCQjTq7Ufx9uZx2IsOk19PwP7GmAY_botbjA9scRBDgFJHdzeTkbPLxFZxC-6Ddy3m/pub?output=csv";
+
+const input = document.getElementById("reInput");
+const resultado = document.getElementById("resultado");
+
+let linhasCSV = [];
+
+fetch(CSV_URL)
+  .then(r => r.text())
+  .then(csv => {
+    linhasCSV = csv.split(/\r?\n/);
+  });
+
+input.addEventListener("input", () => {
+  const re = input.value.trim().toLowerCase();
+
+  if (re.length < 3) {
+    resultado.style.display = "none";
+    return;
+  }
+
+  const linhaEncontrada = linhasCSV.find(l =>
+    l.toLowerCase().includes(re)
+  );
+
+  if (linhaEncontrada) {
+    resultado.className = "resultado encontrado";
+    resultado.innerHTML =
+      `<strong>RE encontrado</strong><br><br>${linhaEncontrada.replace(/","|"/g," | ")}`;
+    resultado.style.display = "block";
+  } else {
+    resultado.className = "resultado nao-encontrado";
+    resultado.innerHTML =
+      "RE não encontrado. Na preleção procure um superior da escala";
+    resultado.style.display = "block";
+  }
+});
+</script>
+
+</body>
+</html>
