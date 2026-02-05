@@ -6,11 +6,10 @@
 
 <style>
 body {
-  margin: 0;
-  padding: 0;
   background: #0f0f0f;
   color: #e0e0e0;
   font-family: "Segoe UI", Tahoma, sans-serif;
+  margin: 0;
 }
 
 .container {
@@ -37,14 +36,14 @@ input {
 
 .resultado {
   margin-top: 30px;
-  padding: 20px;
+  padding: 22px;
   border-radius: 12px;
-  font-size: 18px;
+  font-size: 20px;
   display: none;
 }
 
 .encontrado {
-  background: rgba(30,136,255,0.15);
+  background: rgba(30,136,255,0.18);
   border: 1px solid #1e88ff;
 }
 
@@ -62,9 +61,9 @@ input {
   <h1>Consulta de Escala</h1>
 
   <input
-    type="text"
     id="reInput"
-    placeholder="Digite o RE (ex: 155.666-9)"
+    type="text"
+    placeholder="Digite o RE (ex: 154.466-7)"
   >
 
   <div id="resultado" class="resultado"></div>
@@ -77,32 +76,48 @@ const CSV_URL =
 const input = document.getElementById("reInput");
 const resultado = document.getElementById("resultado");
 
-let linhasCSV = [];
+let linhas = [];
 
 fetch(CSV_URL)
   .then(r => r.text())
   .then(csv => {
-    linhasCSV = csv.split(/\r?\n/);
+    linhas = csv.split(/\r?\n/);
   });
 
 input.addEventListener("input", () => {
-  const re = input.value.trim().toLowerCase();
+  const re = input.value.trim();
 
-  if (re.length < 3) {
+  if (re.length < 6) {
     resultado.style.display = "none";
     return;
   }
 
-  const linhaEncontrada = linhasCSV.find(l =>
-    l.toLowerCase().includes(re)
-  );
+  let encontrado = false;
 
-  if (linhaEncontrada) {
-    resultado.className = "resultado encontrado";
-    resultado.innerHTML =
-      `<strong>RE encontrado</strong><br><br>${linhaEncontrada.replace(/","|"/g," | ")}`;
-    resultado.style.display = "block";
-  } else {
+  for (const linha of linhas) {
+    if (!linha.includes(re)) continue;
+
+    const colunas = linha.split(",");
+
+    for (let i = 0; i < colunas.length; i++) {
+      if (colunas[i].includes(re)) {
+
+        const unidade = colunas[i + 2] || "";
+        const policial = colunas[i + 3] || "";
+
+        if (unidade && policial) {
+          resultado.className = "resultado encontrado";
+          resultado.innerHTML =
+            `<strong>${unidade}</strong><br>${policial}`;
+          resultado.style.display = "block";
+          encontrado = true;
+          return;
+        }
+      }
+    }
+  }
+
+  if (!encontrado) {
     resultado.className = "resultado nao-encontrado";
     resultado.innerHTML =
       "RE não encontrado. Na preleção procure um superior da escala";
