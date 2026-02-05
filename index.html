@@ -63,13 +63,15 @@ input {
   <input
     id="reInput"
     type="text"
-    placeholder="Digite o RE (ex: 154.466-7)"
+    placeholder='Digite o RE (ex: "154.466-7")'
+    autocomplete="off"
   >
 
   <div id="resultado" class="resultado"></div>
 </div>
 
 <script>
+/* 🔹 LINK DO CSV — SOMENTE ABA CONSULTA */
 const CSV_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vStjOw-tr--fHNCQjTq7Ufx9uZx2IsOk19PwP7GmAY_botbjA9scRBDgFJHdzeTkbPLxFZxC-6Ddy3m/pub?gid=GID_DA_ABA_CONSULTA&single=true&output=csv";
 
@@ -78,14 +80,21 @@ const resultado = document.getElementById("resultado");
 
 let linhas = [];
 
+/* 🔹 Normaliza RE (remove tudo que não for número) */
+function normalizarRE(valor) {
+  return valor.replace(/\D/g, "");
+}
+
+/* 🔹 Carrega o CSV */
 fetch(CSV_URL)
   .then(res => res.text())
   .then(csv => {
     linhas = csv.split(/\r?\n/);
   });
 
+/* 🔹 Busca em tempo real */
 input.addEventListener("input", () => {
-  const reDigitado = input.value.trim();
+  const reDigitado = normalizarRE(input.value);
 
   if (reDigitado.length < 6) {
     resultado.style.display = "none";
@@ -95,14 +104,14 @@ input.addEventListener("input", () => {
   let encontrado = false;
 
   for (let i = 1; i < linhas.length; i++) { // pula cabeçalho
-    const colunas = linhas[i].split(",");
+    const colunas = linhas[i].split(";"); // CSV pt-BR
 
-    const rePlanilha = (colunas[1] || "").trim(); // coluna B
-    const infoEscala = (colunas[3] || "").trim(); // coluna D
+    const rePlanilha = normalizarRE(colunas[1] || ""); // coluna B
+    const escala = (colunas[3] || "").trim();          // coluna D
 
-    if (rePlanilha === reDigitado) {
+    if (rePlanilha === reDigitado && escala) {
       resultado.className = "resultado encontrado";
-      resultado.innerHTML = `<strong>Escala</strong><br>${infoEscala}`;
+      resultado.innerHTML = `<strong>Escala</strong><br>${escala}`;
       resultado.style.display = "block";
       encontrado = true;
       break;
