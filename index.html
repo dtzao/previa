@@ -120,48 +120,48 @@ const CSV_URL =
 const input = document.getElementById("reInput");
 const resultado = document.getElementById("resultado");
 
-/* 🔒 Bloqueia letras */
+/* Bloqueia letras */
 input.addEventListener("input", () => {
   input.value = input.value.replace(/[^\d.-]/g, "");
 });
 
-/* 🔄 Cache local */
-let linhas = JSON.parse(localStorage.getItem("escala_cache") || "null");
-
-if (!linhas) {
-  fetch(CSV_URL)
-    .then(r => r.text())
-    .then(csv => {
-      linhas = csv.split(/\r?\n/);
-      localStorage.setItem("escala_cache", JSON.stringify(linhas));
-    });
+/* Normaliza RE (remove tudo que não for número) */
+function normalizarRE(valor) {
+  return (valor || "").replace(/\D/g, "");
 }
 
-/* 🔹 Normaliza RE */
-function normalizar(valor) {
-  return valor.replace(/\D/g, "");
-}
+let linhas = [];
+
+/* Carrega CSV */
+fetch(CSV_URL)
+  .then(r => r.text())
+  .then(csv => {
+    csv = csv.replace(/^\uFEFF/, ""); // remove BOM
+    linhas = csv.split(/\r?\n/);
+  });
 
 function consultar() {
-  const reDigitado = normalizar(input.value);
-
+  const reDigitado = normalizarRE(input.value);
   resultado.style.display = "none";
 
   if (reDigitado.length < 6) return;
 
-  for (let i = 1; i < linhas.length; i++) {
-    const col = linhas[i].split(";");
+  /* Linha 3 em diante → índice 2 */
+  for (let i = 2; i < linhas.length; i++) {
+    if (!linhas[i]) continue;
 
-    const re = normalizar(col[1] || "");
-    const nome = (col[2] || "").trim();
-    const unidade = (col[3] || "").trim();
-    const escala = (col[4] || "").trim();
+    const colunas = linhas[i]
+      .split(";")
+      .map(c => c.replace(/"/g, "").trim());
+
+    const re = normalizarRE(colunas[1]);   // B
+    const nome = colunas[2] || "";         // C
+    const escala = colunas[3] || "";       // D
 
     if (re === reDigitado) {
       resultado.className = "resultado encontrado";
       resultado.innerHTML = `
         <p><strong>${nome}</strong></p>
-        <p>${unidade}</p>
         <p><strong>Escala:</strong> ${escala}</p>
       `;
       resultado.style.display = "block";
@@ -176,7 +176,9 @@ function consultar() {
 }
 </script>
 
+
 </body>
 </html>
+
 
 
