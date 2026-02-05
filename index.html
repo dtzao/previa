@@ -2,55 +2,92 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Consulta de Escala por RE</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulta de Escala – PMESP</title>
 
 <style>
+* { box-sizing: border-box; }
+
 body {
-  background: #0f0f0f;
-  color: #e0e0e0;
-  font-family: "Segoe UI", Tahoma, sans-serif;
   margin: 0;
+  background: linear-gradient(180deg, #0a0f1a, #000);
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #e0e0e0;
 }
 
 .container {
-  max-width: 900px;
-  margin: 80px auto;
-  padding: 0 20px;
+  max-width: 600px;
+  margin: auto;
+  padding: 30px 16px;
   text-align: center;
 }
 
 h1 {
   color: #1e88ff;
-  margin-bottom: 30px;
+  font-size: 26px;
+  margin-bottom: 8px;
+}
+
+.sub {
+  font-size: 14px;
+  color: #aaa;
+  margin-bottom: 25px;
 }
 
 input {
   width: 100%;
-  padding: 14px 18px;
-  font-size: 16px;
-  border-radius: 10px;
-  border: 1px solid #333;
-  background: #1a1a1a;
+  padding: 16px;
+  font-size: 18px;
+  border-radius: 12px;
+  border: none;
+  background: #121826;
   color: #fff;
+  text-align: center;
+}
+
+button {
+  width: 100%;
+  margin-top: 15px;
+  padding: 16px;
+  font-size: 18px;
+  border-radius: 12px;
+  border: none;
+  background: #1e88ff;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #166fd1;
 }
 
 .resultado {
-  margin-top: 30px;
-  padding: 22px;
-  border-radius: 12px;
-  font-size: 20px;
+  margin-top: 25px;
+  padding: 20px;
+  border-radius: 14px;
   display: none;
 }
 
 .encontrado {
-  background: rgba(30,136,255,0.18);
+  background: rgba(30,136,255,0.15);
   border: 1px solid #1e88ff;
 }
 
 .nao-encontrado {
   background: rgba(255,70,70,0.15);
   border: 1px solid #ff4d4d;
-  color: #ffb3b3;
+}
+
+.resultado p {
+  margin: 6px 0;
+  font-size: 16px;
+}
+
+footer {
+  margin-top: 40px;
+  font-size: 12px;
+  color: #777;
 }
 </style>
 </head>
@@ -58,73 +95,85 @@ input {
 <body>
 
 <div class="container">
-  <h1>Consulta de Escala</h1>
+  <h1>Polícia Militar do Estado de São Paulo</h1>
+  <div class="sub">Consulta de Escala Operacional</div>
 
   <input
     id="reInput"
-    type="text"
-    placeholder='Digite o RE (ex: "154.466-7")'
-    autocomplete="off"
+    placeholder="Digite o RE (ex: 154.466-7)"
+    inputmode="numeric"
   >
 
+  <button onclick="consultar()">Consultar Escala</button>
+
   <div id="resultado" class="resultado"></div>
+
+  <footer>
+    SD PM 154.466-7 ANDERSON SILVA
+  </footer>
 </div>
 
 <script>
-/* 🔹 LINK DO CSV — SOMENTE ABA CONSULTA */
 const CSV_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vStjOw-tr--fHNCQjTq7Ufx9uZx2IsOk19PwP7GmAY_botbjA9scRBDgFJHdzeTkbPLxFZxC-6Ddy3m/pub?gid=GID_DA_ABA_CONSULTA&single=true&output=csv";
 
 const input = document.getElementById("reInput");
 const resultado = document.getElementById("resultado");
 
-let linhas = [];
+/* 🔒 Bloqueia letras */
+input.addEventListener("input", () => {
+  input.value = input.value.replace(/[^\d.-]/g, "");
+});
 
-/* 🔹 Normaliza RE (remove tudo que não for número) */
-function normalizarRE(valor) {
+/* 🔄 Cache local */
+let linhas = JSON.parse(localStorage.getItem("escala_cache") || "null");
+
+if (!linhas) {
+  fetch(CSV_URL)
+    .then(r => r.text())
+    .then(csv => {
+      linhas = csv.split(/\r?\n/);
+      localStorage.setItem("escala_cache", JSON.stringify(linhas));
+    });
+}
+
+/* 🔹 Normaliza RE */
+function normalizar(valor) {
   return valor.replace(/\D/g, "");
 }
 
-/* 🔹 Carrega o CSV */
-fetch(CSV_URL)
-  .then(res => res.text())
-  .then(csv => {
-    linhas = csv.split(/\r?\n/);
-  });
+function consultar() {
+  const reDigitado = normalizar(input.value);
 
-/* 🔹 Busca em tempo real */
-input.addEventListener("input", () => {
-  const reDigitado = normalizarRE(input.value);
+  resultado.style.display = "none";
 
-  if (reDigitado.length < 6) {
-    resultado.style.display = "none";
-    return;
-  }
+  if (reDigitado.length < 6) return;
 
-  let encontrado = false;
+  for (let i = 1; i < linhas.length; i++) {
+    const col = linhas[i].split(";");
 
-  for (let i = 1; i < linhas.length; i++) { // pula cabeçalho
-    const colunas = linhas[i].split(";"); // CSV pt-BR
+    const re = normalizar(col[1] || "");
+    const nome = (col[2] || "").trim();
+    const unidade = (col[3] || "").trim();
+    const escala = (col[4] || "").trim();
 
-    const rePlanilha = normalizarRE(colunas[1] || ""); // coluna B
-    const escala = (colunas[3] || "").trim();          // coluna D
-
-    if (rePlanilha === reDigitado && escala) {
+    if (re === reDigitado) {
       resultado.className = "resultado encontrado";
-      resultado.innerHTML = `<strong>Escala</strong><br>${escala}`;
+      resultado.innerHTML = `
+        <p><strong>${nome}</strong></p>
+        <p>${unidade}</p>
+        <p><strong>Escala:</strong> ${escala}</p>
+      `;
       resultado.style.display = "block";
-      encontrado = true;
-      break;
+      return;
     }
   }
 
-  if (!encontrado) {
-    resultado.className = "resultado nao-encontrado";
-    resultado.innerHTML =
-      "RE não encontrado. Na preleção procure um superior da escala";
-    resultado.style.display = "block";
-  }
-});
+  resultado.className = "resultado nao-encontrado";
+  resultado.innerHTML =
+    "<p>RE não localizado.</p><p>Procure um superior da escala.</p>";
+  resultado.style.display = "block";
+}
 </script>
 
 </body>
