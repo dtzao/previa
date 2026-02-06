@@ -114,7 +114,6 @@ footer {
 </div>
 
 <script>
-/* 🔹 CSV da aba CONSULTA */
 const CSV_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vStjOw-tr--fHNCQjTq7Ufx9uZx2IsOk19PwP7GmAY_botbjA9scRBDgFJHdzeTkbPLxFZxC-6Ddy3m/pub?gid=1668908912&single=true&output=csv";
 
@@ -131,9 +130,16 @@ function normalizarRE(txt) {
   return (txt || "").replace(/\D/g, "");
 }
 
+/* Limpa nome (remove vírgulas soltas e espaços extras) */
+function limparNome(txt) {
+  return txt
+    .replace(/,+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 let registros = [];
 
-/* Carrega e interpreta a planilha */
 fetch(CSV_URL)
   .then(r => r.text())
   .then(csv => {
@@ -151,19 +157,17 @@ fetch(CSV_URL)
 
       const textoLinha = colunas.join(" ");
 
-      /* Coluna D → ESCALA */
       if (colunas[3] && colunas[3].length > 2) {
         escalaAtual = colunas[3];
       }
 
-      /* Procura RE em qualquer parte da linha */
       const matchRE = textoLinha.match(/\d{3}\.?\d{3}-?\d/);
 
       if (matchRE) {
         registros.push({
           re: normalizarRE(matchRE[0]),
-          nome: textoLinha,
-          escala: escalaAtual || "Escala não definida"
+          nome: limparNome(textoLinha),
+          escala: escalaAtual || ""
         });
       }
     }
@@ -173,15 +177,27 @@ function consultar() {
   const reBusca = normalizarRE(input.value);
   resultado.style.display = "none";
 
-  if (reBusca.length < 6) return;
+  if (reBusca.length < 7) {
+    resultado.className = "resultado nao-encontrado";
+    resultado.innerHTML =
+      "<p>Colocar o RE completo inclusive o dígito.</p>";
+    resultado.style.display = "block";
+    return;
+  }
 
   const achado = registros.find(r => r.re === reBusca);
 
   if (achado) {
     resultado.className = "resultado encontrado";
+
+    const textoEscala =
+      achado.escala && achado.escala !== "Escala não definida"
+        ? `<p><strong>Escala:</strong> ${achado.escala}</p>`
+        : `<p><strong>Escalado</strong></p>`;
+
     resultado.innerHTML = `
       <p><strong>${achado.nome}</strong></p>
-      <p><strong>Escala:</strong> ${achado.escala}</p>
+      ${textoEscala}
     `;
   } else {
     resultado.className = "resultado nao-encontrado";
