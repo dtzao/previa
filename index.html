@@ -208,21 +208,18 @@ function consultar() {
   const achado = registros.find(r => r.re === reBusca);
 
   if (achado) {
-    resultado.className = "resultado encontrado";
+  resultado.className = "resultado encontrado";
 
-    resultado.innerHTML = `
-      <p><strong>Registro localizado</strong></p>
+  // Quebra o nome em partes
+  const partesNome = achado.nome.split(/\s{2,}|(?=ENCARREGADO|VTR)/);
 
-      <p>
-        <strong>Nome:</strong><br>
-        ${achado.nome}
-      </p>
+  resultado.innerHTML = `
+    <p><strong>Registro localizado</strong></p>
 
-      <p>
-        <strong>Escala:</strong><br>
-        ${achado.escala || "Servidor escalado"}
-      </p>
-    `;
+    <p>${partesNome[0] || ""}</p>
+    <p>${partesNome[1] || ""}</p>
+    <p>${achado.escala || "Servidor escalado"}</p>
+  `;
   } else {
     resultado.className = "resultado nao-encontrado";
     resultado.innerHTML = `
@@ -237,3 +234,4 @@ function consultar() {
 
 </body>
 </html>
+
