@@ -109,11 +109,12 @@ footer {
   <div id="resultado" class="resultado"></div>
 
   <footer>
-    Desenvolvimento Sd Pm 154.466-7 Anderson Silva
+    Desenvolvimento Sd PM 154.466-7 Anderson Silva
   </footer>
 </div>
 
 <script>
+/* 🔹 CSV da aba CONSULTA */
 const CSV_URL =
 "https://docs.google.com/spreadsheets/d/e/2PACX-1vStjOw-tr--fHNCQjTq7Ufx9uZx2IsOk19PwP7GmAY_botbjA9scRBDgFJHdzeTkbPLxFZxC-6Ddy3m/pub?gid=1668908912&single=true&output=csv";
 
@@ -125,60 +126,72 @@ input.addEventListener("input", () => {
   input.value = input.value.replace(/[^\d.-]/g, "");
 });
 
-/* Normaliza RE (remove tudo que não for número) */
-function normalizarRE(valor) {
-  return (valor || "").replace(/\D/g, "");
+/* Remove tudo que não for número */
+function normalizarRE(txt) {
+  return (txt || "").replace(/\D/g, "");
 }
 
-let linhas = [];
+let registros = [];
 
-/* Carrega CSV */
+/* Carrega e interpreta a planilha */
 fetch(CSV_URL)
   .then(r => r.text())
   .then(csv => {
-    csv = csv.replace(/^\uFEFF/, ""); // remove BOM
-    linhas = csv.split(/\r?\n/);
+    csv = csv.replace(/^\uFEFF/, "");
+    const linhas = csv.split(/\r?\n/);
+
+    let escalaAtual = "";
+
+    for (let i = 0; i < linhas.length; i++) {
+      if (!linhas[i]) continue;
+
+      const colunas = linhas[i]
+        .split(";")
+        .map(c => c.replace(/"/g, "").trim());
+
+      const textoLinha = colunas.join(" ");
+
+      /* Coluna D → ESCALA */
+      if (colunas[3] && colunas[3].length > 2) {
+        escalaAtual = colunas[3];
+      }
+
+      /* Procura RE em qualquer parte da linha */
+      const matchRE = textoLinha.match(/\d{3}\.?\d{3}-?\d/);
+
+      if (matchRE) {
+        registros.push({
+          re: normalizarRE(matchRE[0]),
+          nome: textoLinha,
+          escala: escalaAtual || "Escala não definida"
+        });
+      }
+    }
   });
 
 function consultar() {
-  const reDigitado = normalizarRE(input.value);
+  const reBusca = normalizarRE(input.value);
   resultado.style.display = "none";
 
-  if (reDigitado.length < 6) return;
+  if (reBusca.length < 6) return;
 
-  /* Linha 3 em diante → índice 2 */
-  for (let i = 2; i < linhas.length; i++) {
-    if (!linhas[i]) continue;
+  const achado = registros.find(r => r.re === reBusca);
 
-    const colunas = linhas[i]
-      .split(";")
-      .map(c => c.replace(/"/g, "").trim());
-
-    const re = normalizarRE(colunas[1]);   // B
-    const nome = colunas[2] || "";         // C
-    const escala = colunas[3] || "";       // D
-
-    if (re === reDigitado) {
-      resultado.className = "resultado encontrado";
-      resultado.innerHTML = `
-        <p><strong>${nome}</strong></p>
-        <p><strong>Escala:</strong> ${escala}</p>
-      `;
-      resultado.style.display = "block";
-      return;
-    }
+  if (achado) {
+    resultado.className = "resultado encontrado";
+    resultado.innerHTML = `
+      <p><strong>${achado.nome}</strong></p>
+      <p><strong>Escala:</strong> ${achado.escala}</p>
+    `;
+  } else {
+    resultado.className = "resultado nao-encontrado";
+    resultado.innerHTML =
+      "<p>RE não localizado.</p><p>Na preleção procure um ESCALANTE.</p>";
   }
 
-  resultado.className = "resultado nao-encontrado";
-  resultado.innerHTML =
-    "<p>RE não localizado.</p><p>Na preleção procure um ESCALANTE.</p>";
   resultado.style.display = "block";
 }
 </script>
 
-
 </body>
 </html>
-
-
-
