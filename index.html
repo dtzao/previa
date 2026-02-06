@@ -86,8 +86,17 @@ button:hover {
 }
 
 .resultado p {
-  margin: 8px 0;
+  margin: 0;
   font-size: 15px;
+  line-height: 1.6;
+}
+
+.resultado p + p {
+  margin-top: 14px;
+}
+
+.resultado strong {
+  color: #93c5fd;
 }
 
 footer {
@@ -132,7 +141,7 @@ const input = document.getElementById("reInput");
 const resultado = document.getElementById("resultado");
 
 input.addEventListener("input", () => {
-  input.value = input.value.replace(/[^\d.-]/g, "");
+  input.value = input.value.replace(/\D/g, "");
 });
 
 function normalizarRE(txt) {
@@ -140,7 +149,10 @@ function normalizarRE(txt) {
 }
 
 function limparNome(txt) {
-  return txt.replace(/,+/g, "").replace(/\s+/g, " ").trim();
+  return txt
+    .replace(/,+/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 let registros = [];
@@ -158,6 +170,7 @@ fetch(CSV_URL)
       const colunas = linha.split(";").map(c => c.replace(/"/g, "").trim());
       const textoLinha = colunas.join(" ");
 
+      // Detecta escala
       if (colunas[3] && colunas[3].length > 2) {
         escalaAtual = colunas[3];
       }
@@ -165,9 +178,15 @@ fetch(CSV_URL)
       const matchRE = textoLinha.match(/\d{3}\.?\d{3}-?\d/);
 
       if (matchRE) {
+        let nomeLimpo = textoLinha;
+
+        if (escalaAtual) {
+          nomeLimpo = nomeLimpo.replace(escalaAtual, "");
+        }
+
         registros.push({
           re: normalizarRE(matchRE[0]),
-          nome: limparNome(textoLinha),
+          nome: limparNome(nomeLimpo),
           escala: escalaAtual || ""
         });
       }
@@ -181,7 +200,7 @@ function consultar() {
   if (reBusca.length < 7) {
     resultado.className = "resultado nao-encontrado";
     resultado.innerHTML =
-      "<p><strong>Atenção:</strong> Informe o RE completo, incluindo o dígito.</p>";
+      "<p><strong>Atenção:</strong><br>Informe o RE completo, incluindo o dígito.</p>";
     resultado.style.display = "block";
     return;
   }
@@ -191,19 +210,25 @@ function consultar() {
   if (achado) {
     resultado.className = "resultado encontrado";
 
-    const escalaTexto = achado.escala
-      ? `<p><strong>Escala:</strong> ${achado.escala}</p>`
-      : `<p><strong>Situação:</strong> Servidor escalado</p>`;
-
     resultado.innerHTML = `
       <p><strong>Registro localizado</strong></p>
-      <p>${achado.nome}</p>
-      ${escalaTexto}
+
+      <p>
+        <strong>Nome:</strong><br>
+        ${achado.nome}
+      </p>
+
+      <p>
+        <strong>Escala:</strong><br>
+        ${achado.escala || "Servidor escalado"}
+      </p>
     `;
   } else {
     resultado.className = "resultado nao-encontrado";
-    resultado.innerHTML =
-      "<p><strong>Registro funcional não localizado.</strong></p><p>Consultar a preleção ou o escalante responsável.</p>";
+    resultado.innerHTML = `
+      <p><strong>Registro funcional não localizado</strong></p>
+      <p>Consultar a preleção ou o escalante responsável.</p>
+    `;
   }
 
   resultado.style.display = "block";
