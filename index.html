@@ -22,9 +22,7 @@ body {
   text-align: center;
 }
 
-header {
-  margin-bottom: 30px;
-}
+header { margin-bottom: 30px; }
 
 header h1 {
   font-size: 22px;
@@ -63,9 +61,8 @@ button {
   cursor: pointer;
 }
 
-button:hover {
-  background: #1d4ed8;
-}
+button:hover { background: #1d4ed8; }
+button:disabled { opacity: .6; cursor: not-allowed; }
 
 .resultado {
   margin-top: 28px;
@@ -91,9 +88,7 @@ button:hover {
   line-height: 1.6;
 }
 
-.resultado p + p {
-  margin-top: 10px;
-}
+.resultado p + p { margin-top: 10px; }
 
 .badge-funcao {
   display: inline-block;
@@ -124,7 +119,7 @@ footer {
 </header>
 
 <input id="reInput" placeholder="Informe o Registro Funcional (RE)" inputmode="numeric">
-<button onclick="consultar()">Consultar Escala</button>
+<button id="btnConsultar" onclick="consultar()">Consultar Escala</button>
 <div id="resultado" class="resultado"></div>
 
 <footer>
@@ -139,81 +134,148 @@ const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vStjOw-tr--fHNC
 
 const input = document.getElementById("reInput");
 const resultado = document.getElementById("resultado");
+const btn = document.getElementById("btnConsultar");
 
 input.addEventListener("input", () => {
   input.value = input.value.replace(/\D/g, "");
 });
 
-function normalizarRE(v) {
-  return (v || "").replace(/\D/g, "");
+// Enter para consultar
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") consultar();
+});
+
+function normalizarRE(v) { return (v || "").replace(/\D/g, ""); }
+
+/** CSV parser com aspas */
+function parseCSV(text, delimiter) {
+  const rows = [];
+  let row = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    const next = text[i + 1];
+
+    if (ch === '"') {
+      if (inQuotes && next === '"') { cur += '"'; i++; }
+      else { inQuotes = !inQuotes; }
+      continue;
+    }
+
+    if (!inQuotes && ch === delimiter) {
+      row.push(cur); cur = ""; continue;
+    }
+
+    if (!inQuotes && (ch === "\n" || ch === "\r")) {
+      if (ch === "\r" && next === "\n") i++;
+      row.push(cur); cur = "";
+      if (row.some(c => (c || "").trim() !== "")) rows.push(row);
+      row = [];
+      continue;
+    }
+
+    cur += ch;
+  }
+
+  row.push(cur);
+  if (row.some(c => (c || "").trim() !== "")) rows.push(row);
+
+  return rows;
 }
 
-/* 🔹 CLASSIFICAÇÃO PMESP */
-function separarDados(texto) {
-  let t = texto.toUpperCase();
+/** Detecta separador entre ; e , pela primeira linha não-vazia */
+function detectarSeparador(csvText) {
+  const firstLine = (csvText.split(/\r?\n/).find(l => l.trim().length) || "");
+  const sc = (firstLine.match(/;/g) || []).length;
+  const cc = (firstLine.match(/,/g) || []).length;
+  return (sc > cc) ? ";" : ",";
+}
 
-  /* 🔧 1. NORMALIZA SIGLAS COLADAS */
+/** Corrige “palavras coladas” em pontos críticos (ex.: TATIANEFOLGA => TATIANE FOLGA) */
+function descolarPalavrasCriticas(t) {
+  if (!t) return "";
+  // 1) Espaço antes de palavras de escala quando coladas ao final do nome
+  const termos = [
+    "FOLGA","MENSAL","REF","JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ",
+    "JANEIRO","FEVEREIRO","MARCO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"
+  ];
+  // Insere espaço entre letra e o termo (TATIANEFOLGA -> TATIANE FOLGA)
+  const re1 = new RegExp(`([A-ZÁÉÍÓÚÂÊÔÃÕÇ])(?=(${termos.join("|")}))`, "g");
+  t = t.replace(re1, "$1 ");
+
+  // 2) Descola sequências comuns coladas
+  t = t.replace(/FOLGAMENSAL/g, "FOLGA MENSAL")
+       .replace(/MENSALREF/g, "MENSAL REF");
+
+  // 3) Normaliza espaços
+  return t.replace(/\s+/g, " ").trim();
+}
+
+/* 🔹 CLASSIFICAÇÃO PMESP (mantendo sua lógica, só mais “blindada”) */
+function separarDados(texto) {
+  let t = (texto || "").toUpperCase();
+
+  // antes de tudo, tenta descolar palavras de escala que vieram grudadas no nome
+  t = descolarPalavrasCriticas(t);
+
+  /* 1) NORMALIZA SIGLAS COLADAS */
   const siglas = [
     "SUB TEN PM","1º SGT PM","2º SGT PM","3º SGT PM","CB PM","SD PM",
     "BPM/M","CIA","CICC","CPAM","CPA","RPM",
     "ENCARREGADO","CGP","AUX","MOT","VTR"
   ];
 
-  // força espaço antes e depois das siglas
   siglas.forEach(s => {
-    const r = new RegExp(s.replace(/\//g,"\\/"), "g");
+    const safe = s.replace(/\//g,"\\/");
+    // força “espaços” ao redor sem depender de borda de palavra (para colado)
+    const r = new RegExp(`\\s*${safe}\\s*`, "g");
     t = t.replace(r, " " + s + " ");
   });
 
-  // limpa excesso de espaço
   t = t.replace(/\s+/g, " ").trim();
 
-  /* 🔹 2. POSTO / GRADUAÇÃO */
+  /* 2) POSTO / GRADUAÇÃO */
   let grad = "";
-  const postos = [
-    "SUB TEN PM","1º SGT PM","2º SGT PM","3º SGT PM","CB PM","SD PM"
-  ];
+  const postos = ["SUB TEN PM","1º SGT PM","2º SGT PM","3º SGT PM","CB PM","SD PM"];
   for (let p of postos) {
     if (t.includes(p)) {
       grad = p;
-      t = t.replace(p,"").trim();
+      t = t.replace(p, "").trim();
       break;
     }
   }
 
-  /* 🔹 3. FUNÇÃO */
+  /* 3) FUNÇÃO */
   let funcao = "";
   const funcoes = ["ENCARREGADO","CGP","AUX","MOT","VTR","CICC"];
   for (let f of funcoes) {
     if (t.endsWith(f)) {
       funcao = f;
-      t = t.replace(f,"").trim();
+      t = t.slice(0, -f.length).trim();
       break;
     }
   }
 
-  /* 🔹 4. UNIDADE */
-  /* 🔹 UNIDADE (sempre com número) */
-let unidade = "";
-
-// BPM ou BPM/M com número
-const mBpm = t.match(/\d+º?\s*BPM\/M|\d+º?\s*BPM/i);
-if (mBpm) {
-  unidade = mBpm[0];
-  t = t.replace(mBpm[0], "").trim();
-} else {
-  // demais unidades sem número
-  const outras = ["CIA","CICC","CPAM","CPA","RPM"];
-  for (let u of outras) {
-    if (t.includes(u)) {
-      unidade = u;
-      t = t.replace(u,"").trim();
-      break;
+  /* 4) UNIDADE (sempre com número quando BPM) */
+  let unidade = "";
+  const mBpm = t.match(/(\d+º?\s*BPM\/M|\d+º?\s*BPM)/i);
+  if (mBpm) {
+    unidade = mBpm[0].toUpperCase().replace(/\s+/g, " ").trim();
+    t = t.replace(mBpm[0], "").trim();
+  } else {
+    const outras = ["CIA","CICC","CPAM","CPA","RPM"];
+    for (let u of outras) {
+      if (t.includes(u)) {
+        unidade = u;
+        t = t.replace(u, "").trim();
+        break;
+      }
     }
   }
-}
 
-  /* 🔹 5. NOME (o que sobrou) */
+  /* 5) NOME (o que sobrou) */
   t = t.replace(/,+/g,"").replace(/\s+/g," ").trim();
 
   return {
@@ -225,68 +287,120 @@ if (mBpm) {
 
 let registros = [];
 const reSet = new Set();
+let carregado = false;
 
-/* 🔒 CSV BLINDADO */
-fetch(CSV_URL)
-.then(r => r.text())
-.then(csv => {
-  csv = csv.replace(/^\uFEFF/,"");
-  const linhas = csv.split(/\r?\n/);
-  let escalaAtual = "";
+function setStatus(tipo, html) {
+  resultado.style.display = "block";
+  resultado.className = `resultado ${tipo}`;
+  resultado.innerHTML = html;
+}
 
-  for (let l of linhas) {
-    if (!l || l.length < 5) continue;
+async function carregarBase() {
+  carregado = false;
+  registros = [];
+  reSet.clear();
 
-    const cols = l.split(";").map(c => c.replace(/"/g,"").trim());
-    if (cols[3]) escalaAtual = cols[3];
+  btn.disabled = true;
+  setStatus("encontrado", "<p><strong>Carregando base…</strong></p><p>Aguarde alguns segundos.</p>");
 
-    const texto = cols.join(" ");
-    const m = texto.match(/\d{3}\.?\d{3}-?\d/);
-    if (!m) continue;
+  try {
+    const r = await fetch(CSV_URL, { cache: "no-store" });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    let csv = await r.text();
+    csv = csv.replace(/^\uFEFF/,"");
 
-    const re = normalizarRE(m[0]);
-    if (reSet.has(re)) continue;
-    reSet.add(re);
+    const sep = detectarSeparador(csv);
+    const rows = parseCSV(csv, sep);
 
-    let limpo = texto.replace(m[0],"");
-    if (escalaAtual) limpo = limpo.replace(escalaAtual,"");
+    let escalaAtual = "";
 
-    const dados = separarDados(limpo);
+    for (const row of rows) {
+      // mantém a lógica: cols[3] define escalaAtual quando existir
+      const cols = row.map(c => (c || "").replace(/"/g,"").trim());
+      if (cols[3]) escalaAtual = cols[3];
 
-    registros.push({
-      re,
-      reBase: re.slice(0,-1),
-      ...dados,
-      escala: escalaAtual
-    });
+      // linha completa
+      const texto = cols.join(" ").replace(/\s+/g, " ").trim();
+
+      // acha RE
+      const m = texto.match(/\b\d{3}\.?\d{3}-?\d\b/);
+      if (!m) continue;
+
+      const re = normalizarRE(m[0]);
+      if (reSet.has(re)) continue;
+      reSet.add(re);
+
+      // remove RE
+      let limpo = texto.replace(m[0], " ");
+
+      // remove “escalaAtual” do corpo (pra não grudar no nome)
+      if (escalaAtual) {
+        const esc = escalaAtual.toUpperCase().replace(/\s+/g, " ").trim();
+        // remove em modo “case-insensitive”, respeitando espaços
+        const escRe = new RegExp(esc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+        limpo = limpo.replace(escRe, " ");
+      }
+
+      // adicional: se vier tipo “FOLGA MENSAL REF ...” no fim colado, isso é escala, não nome:
+      // (mantém a lógica, só ajuda a limpar o “limpo” antes de separarDados)
+      limpo = limpo.toUpperCase();
+      limpo = descolarPalavrasCriticas(limpo);
+      limpo = limpo.replace(/\s+/g, " ").trim();
+
+      const dados = separarDados(limpo);
+
+      registros.push({
+        re,
+        reBase: re.slice(0,-1),
+        ...dados,
+        escala: escalaAtual
+      });
+    }
+
+    carregado = true;
+    btn.disabled = false;
+
+    // opcional: feedback de pronto
+    setStatus("encontrado", `<p><strong>Base carregada</strong></p><p>${registros.length} registros disponíveis.</p>`);
+
+  } catch (e) {
+    btn.disabled = true;
+    setStatus("nao-encontrado", `<p><strong>Falha ao carregar a base</strong></p><p>${String(e.message || e)}</p>`);
   }
-});
+}
 
 function consultar() {
   const busca = normalizarRE(input.value);
   resultado.style.display = "none";
 
+  if (!carregado) {
+    setStatus("nao-encontrado", "<p><strong>Base ainda carregando</strong></p><p>Por favor, aguarde.</p>");
+    return;
+  }
+
+  if (!busca) {
+    setStatus("nao-encontrado", "<p><strong>Informe um RE</strong></p>");
+    return;
+  }
+
   const achado = registros.find(r => r.re === busca || r.reBase === busca);
 
   if (!achado) {
-    resultado.className = "resultado nao-encontrado";
-    resultado.innerHTML = "<p><strong>Registro funcional não localizado</strong></p>";
+    setStatus("nao-encontrado", "<p><strong>Registro funcional não localizado</strong></p>");
   } else {
-    resultado.className = "resultado encontrado";
-    resultado.innerHTML = `
+    setStatus("encontrado", `
       <p><strong>Registro localizado</strong></p>
-      <p>${achado.nome}</p>
+      <p>${achado.nome || ""}</p>
       ${achado.unidade ? `<p><em>${achado.unidade}</em></p>` : ""}
       ${achado.funcao ? `<span class="badge-funcao">${achado.funcao}</span>` : ""}
-      <p style="margin-top:12px;">${achado.escala}</p>
-    `;
+      <p style="margin-top:12px;">${achado.escala || ""}</p>
+    `);
   }
-
-  resultado.style.display = "block";
 }
+
+// inicia carregando ao abrir
+carregarBase();
 </script>
 
 </body>
 </html>
-
-
