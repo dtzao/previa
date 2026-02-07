@@ -196,28 +196,65 @@ function detectarSeparador(csvText) {
 /** Corrige “palavras coladas” em pontos críticos (ex.: TATIANEFOLGA => TATIANE FOLGA) */
 function descolarPalavrasCriticas(t) {
   if (!t) return "";
-  // 1) Espaço antes de palavras de escala quando coladas ao final do nome
+  t = String(t).toUpperCase();
+
   const termos = [
     "FOLGA","MENSAL","REF","JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ",
-    "JANEIRO","FEVEREIRO","MARCO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO"
+    "JANEIRO","FEVEREIRO","MARCO","MARÇO","ABRIL","MAIO","JUNHO","JULHO","AGOSTO","SETEMBRO","OUTUBRO","NOVEMBRO","DEZEMBRO",
+    "EQ","EQUIPE","DIUR","NOT","DIA","NOITE"
   ];
-  // Insere espaço entre letra e o termo (TATIANEFOLGA -> TATIANE FOLGA)
+
   const re1 = new RegExp(`([A-ZÁÉÍÓÚÂÊÔÃÕÇ])(?=(${termos.join("|")}))`, "g");
   t = t.replace(re1, "$1 ");
 
-  // 2) Descola sequências comuns coladas
   t = t.replace(/FOLGAMENSAL/g, "FOLGA MENSAL")
        .replace(/MENSALREF/g, "MENSAL REF");
 
-  // 3) Normaliza espaços
   return t.replace(/\s+/g, " ").trim();
+}
+
+/** ✅ evita “escala contaminada” com dados de outro policial */
+function pareceLinhaDePessoa(s) {
+  if (!s) return false;
+  const t = String(s).toUpperCase();
+
+  const temRE = /\b\d{3}\.?\d{3}-?\d\b/.test(t);
+  const temPostoPM =
+    /\b(SD|CB|SUB\s*TEN|1º\s*SGT|2º\s*SGT|3º\s*SGT)\b/.test(t) && /\bPM\b/.test(t);
+
+  return temRE || temPostoPM;
+}
+
+function pareceEscala(s) {
+  if (!s) return false;
+  const t = String(s).toUpperCase().replace(/\s+/g, " ").trim();
+
+  if (pareceLinhaDePessoa(t)) return false;
+
+  // palavras típicas de escala/serviço (pode ajustar)
+  const chaves = [
+    "FOLGA","MENSAL","REF","ESCALA","PLANT","TURNO",
+    "EQ","EQUIPE","DIUR","NOT","12X","24X","ADMIN","EXPED"
+  ];
+
+  return chaves.some(k => t.includes(k));
+}
+
+function limparEscala(s) {
+  if (!s) return "";
+  let t = String(s).toUpperCase();
+
+  // remove qualquer trecho com “posto + PM + RE ...” caso venha colado na escala
+  t = t.replace(/\b(SD|CB|SUB\s*TEN|1º\s*SGT|2º\s*SGT|3º\s*SGT)\s*PM\s*\d{3}\.?\d{3}-?\d\b.*$/g, "").trim();
+
+  t = t.replace(/\s+/g, " ").trim();
+  return t;
 }
 
 /* 🔹 CLASSIFICAÇÃO PMESP (mantendo sua lógica, só mais “blindada”) */
 function separarDados(texto) {
   let t = (texto || "").toUpperCase();
 
-  // antes de tudo, tenta descolar palavras de escala que vieram grudadas no nome
   t = descolarPalavrasCriticas(t);
 
   /* 1) NORMALIZA SIGLAS COLADAS */
@@ -229,7 +266,6 @@ function separarDados(texto) {
 
   siglas.forEach(s => {
     const safe = s.replace(/\//g,"\\/");
-    // força “espaços” ao redor sem depender de borda de palavra (para colado)
     const r = new RegExp(`\\s*${safe}\\s*`, "g");
     t = t.replace(r, " " + s + " ");
   });
@@ -258,7 +294,7 @@ function separarDados(texto) {
     }
   }
 
-  /* 4) UNIDADE (sempre com número quando BPM) */
+  /* 4) UNIDADE */
   let unidade = "";
   const mBpm = t.match(/(\d+º?\s*BPM\/M|\d+º?\s*BPM)/i);
   if (mBpm) {
@@ -315,14 +351,15 @@ async function carregarBase() {
     let escalaAtual = "";
 
     for (const row of rows) {
-      // mantém a lógica: cols[3] define escalaAtual quando existir
       const cols = row.map(c => (c || "").replace(/"/g,"").trim());
-      if (cols[3]) escalaAtual = cols[3];
 
-      // linha completa
+      // ✅ mantém a lógica do cols[3], mas só aceita se “parecer escala”
+      if (cols[3] && pareceEscala(cols[3])) {
+        escalaAtual = cols[3];
+      }
+
       const texto = cols.join(" ").replace(/\s+/g, " ").trim();
 
-      // acha RE
       const m = texto.match(/\b\d{3}\.?\d{3}-?\d\b/);
       if (!m) continue;
 
@@ -330,20 +367,15 @@ async function carregarBase() {
       if (reSet.has(re)) continue;
       reSet.add(re);
 
-      // remove RE
       let limpo = texto.replace(m[0], " ");
 
-      // remove “escalaAtual” do corpo (pra não grudar no nome)
+      // remove escalaAtual do corpo, se existir
       if (escalaAtual) {
-        const esc = escalaAtual.toUpperCase().replace(/\s+/g, " ").trim();
-        // remove em modo “case-insensitive”, respeitando espaços
+        const esc = String(escalaAtual).toUpperCase().replace(/\s+/g, " ").trim();
         const escRe = new RegExp(esc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
         limpo = limpo.replace(escRe, " ");
       }
 
-      // adicional: se vier tipo “FOLGA MENSAL REF ...” no fim colado, isso é escala, não nome:
-      // (mantém a lógica, só ajuda a limpar o “limpo” antes de separarDados)
-      limpo = limpo.toUpperCase();
       limpo = descolarPalavrasCriticas(limpo);
       limpo = limpo.replace(/\s+/g, " ").trim();
 
@@ -353,16 +385,15 @@ async function carregarBase() {
         re,
         reBase: re.slice(0,-1),
         ...dados,
-        escala: escalaAtual
+        // ✅ garante que nunca apareça “SD PM 240...” na escala
+        escala: limparEscala(escalaAtual)
       });
     }
 
     carregado = true;
     btn.disabled = false;
 
-    // opcional: feedback de pronto
     setStatus("encontrado", `<p><strong>Base carregada</strong></p><p>${registros.length} registros disponíveis.</p>`);
-
   } catch (e) {
     btn.disabled = true;
     setStatus("nao-encontrado", `<p><strong>Falha ao carregar a base</strong></p><p>${String(e.message || e)}</p>`);
