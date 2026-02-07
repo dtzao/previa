@@ -92,14 +92,9 @@ button:hover {
 }
 
 .resultado p + p {
-  margin-top: 12px;
+  margin-top: 10px;
 }
 
-.resultado strong {
-  color: #93c5fd;
-}
-
-/* 🔵 BADGE DA FUNÇÃO */
 .badge-funcao {
   display: inline-block;
   margin-top: 6px;
@@ -121,34 +116,26 @@ footer {
 </head>
 
 <body>
-
 <div class="container">
 
-  <header>
-    <h1>Polícia Militar do Estado de São Paulo</h1>
-    <h2>Diretoria de Pessoal · Consulta de Escala Operacional</h2>
-  </header>
+<header>
+  <h1>Polícia Militar do Estado de São Paulo</h1>
+  <h2>Diretoria de Pessoal · Consulta de Escala Operacional</h2>
+</header>
 
-  <input
-    id="reInput"
-    placeholder="Informe o Registro Funcional (RE)"
-    inputmode="numeric"
-  >
+<input id="reInput" placeholder="Informe o Registro Funcional (RE)" inputmode="numeric">
+<button onclick="consultar()">Consultar Escala</button>
+<div id="resultado" class="resultado"></div>
 
-  <button onclick="consultar()">Consultar Escala</button>
-
-  <div id="resultado" class="resultado"></div>
-
-  <footer>
-    Sistema de apoio administrativo – Uso interno<br>
-    Desenvolvimento: Sd PM 154.466-7 Anderson Silva
-  </footer>
+<footer>
+Sistema de apoio administrativo – Uso interno<br>
+Desenvolvimento: Sd PM 154.466-7 Anderson Silva
+</footer>
 
 </div>
 
 <script>
-const CSV_URL =
-"https://docs.google.com/spreadsheets/d/e/2PACX-1vStjOw-tr--fHNCQjTq7Ufx9uZx2IsOk19PwP7GmAY_botbjA9scRBDgFJHdzeTkbPLxFZxC-6Ddy3m/pub?gid=1668908912&single=true&output=csv";
+const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vStjOw-tr--fHNCQjTq7Ufx9uZx2IsOk19PwP7GmAY_botbjA9scRBDgFJHdzeTkbPLxFZxC-6Ddy3m/pub?gid=1668908912&single=true&output=csv";
 
 const input = document.getElementById("reInput");
 const resultado = document.getElementById("resultado");
@@ -157,112 +144,125 @@ input.addEventListener("input", () => {
   input.value = input.value.replace(/\D/g, "");
 });
 
-function normalizarRE(txt) {
-  return (txt || "").replace(/\D/g, "");
+function normalizarRE(v) {
+  return (v || "").replace(/\D/g, "");
 }
 
-/* 🔒 Separação robusta Nome / Função */
-function separarNomeEFunção(texto) {
-  const funcoes = [
-    "MOT", "VTR", "ENCARREGADO", "CGP", "AUX",
-    "APOIO", "RPM", "SUPERVISOR", "PATRULHA", "VIATURA"
+/* 🔹 CLASSIFICAÇÃO PMESP */
+function separarDados(texto) {
+  let t = texto;
+
+  const posto = [
+    "SUB TEN PM","1º SGT PM","2º SGT PM","3º SGT PM","CB PM","SD PM"
   ];
 
-  let nome = texto;
-  let funcao = "";
+  const unidades = [
+    /\d+º?\s*BPM\/M/i,
+    /\d+º?\s*BPM/i,
+    /\bCIA\b/i,
+    /\bCICC\b/i,
+    /\bCPAM\b/i,
+    /\bCPA\b/i,
+    /\bRPM\b/i
+  ];
 
-  for (let f of funcoes) {
-    const r = new RegExp("\\b" + f + "\\b.*", "i");
-    if (r.test(texto)) {
-      funcao = texto.match(r)[0].trim();
-      nome = texto.replace(r, "").trim();
+  const funcoes = [
+    "ENCARREGADO","CGP","AUX","MOT","VTR","CICC"
+  ];
+
+  let grad = "", unidade = "", funcao = "";
+
+  for (let p of posto) {
+    if (t.includes(p)) {
+      grad = p;
+      t = t.replace(p, "").trim();
       break;
     }
   }
 
-  nome = nome
-    .replace(/,+/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  for (let u of unidades) {
+    const m = t.match(u);
+    if (m) {
+      unidade = m[0];
+      t = t.replace(m[0], "").trim();
+      break;
+    }
+  }
 
-  return { nome, funcao };
+  for (let f of funcoes) {
+    const r = new RegExp(f + "$","i");
+    if (r.test(t)) {
+      funcao = f;
+      t = t.replace(r,"").trim();
+      break;
+    }
+  }
+
+  t = t.replace(/,+/g,"").replace(/\s+/g," ").trim();
+
+  return {
+    nome: `${grad} ${t}`.trim(),
+    unidade,
+    funcao
+  };
 }
 
 let registros = [];
-const reIndex = new Set();
+const reSet = new Set();
 
-/* 🛡️ BLINDAGEM DO CSV */
+/* 🔒 CSV BLINDADO */
 fetch(CSV_URL)
-  .then(r => r.text())
-  .then(csv => {
-    csv = csv.replace(/^\uFEFF/, "");
-    const linhas = csv.split(/\r?\n/);
-    let escalaAtual = "";
+.then(r => r.text())
+.then(csv => {
+  csv = csv.replace(/^\uFEFF/,"");
+  const linhas = csv.split(/\r?\n/);
+  let escalaAtual = "";
 
-    for (let linha of linhas) {
-      if (!linha || linha.trim().length < 5) continue;
+  for (let l of linhas) {
+    if (!l || l.length < 5) continue;
 
-      const colunas = linha.split(";").map(c =>
-        c.replace(/"/g, "").trim()
-      );
+    const cols = l.split(";").map(c => c.replace(/"/g,"").trim());
+    if (cols[3]) escalaAtual = cols[3];
 
-      const textoLinha = colunas.join(" ");
+    const texto = cols.join(" ");
+    const m = texto.match(/\d{3}\.?\d{3}-?\d/);
+    if (!m) continue;
 
-      if (colunas[3] && colunas[3].length > 2) {
-        escalaAtual = colunas[3];
-      }
+    const re = normalizarRE(m[0]);
+    if (reSet.has(re)) continue;
+    reSet.add(re);
 
-      const matchRE = textoLinha.match(/\d{3}\.?\d{3}-?\d/);
-      if (!matchRE) continue;
+    let limpo = texto.replace(m[0],"");
+    if (escalaAtual) limpo = limpo.replace(escalaAtual,"");
 
-      const reCompleto = normalizarRE(matchRE[0]);
-      if (reIndex.has(reCompleto)) continue;
-      reIndex.add(reCompleto);
+    const dados = separarDados(limpo);
 
-      let textoLimpo = textoLinha.replace(matchRE[0], "");
-      if (escalaAtual) textoLimpo = textoLimpo.replace(escalaAtual, "");
-
-      const dados = separarNomeEFunção(textoLimpo);
-
-      registros.push({
-        re: reCompleto,
-        reBase: reCompleto.slice(0, -1),
-        nome: dados.nome,
-        funcao: dados.funcao,
-        escala: escalaAtual || ""
-      });
-    }
-  });
+    registros.push({
+      re,
+      reBase: re.slice(0,-1),
+      ...dados,
+      escala: escalaAtual
+    });
+  }
+});
 
 function consultar() {
-  const reBusca = normalizarRE(input.value);
+  const busca = normalizarRE(input.value);
   resultado.style.display = "none";
 
-  if (reBusca.length < 6) {
+  const achado = registros.find(r => r.re === busca || r.reBase === busca);
+
+  if (!achado) {
     resultado.className = "resultado nao-encontrado";
-    resultado.innerHTML =
-      "<p><strong>Atenção:</strong><br>Informe o RE corretamente.</p>";
-    resultado.style.display = "block";
-    return;
-  }
-
-  const achado = registros.find(r =>
-    r.re === reBusca || r.reBase === reBusca
-  );
-
-  if (achado) {
+    resultado.innerHTML = "<p><strong>Registro funcional não localizado</strong></p>";
+  } else {
     resultado.className = "resultado encontrado";
     resultado.innerHTML = `
       <p><strong>Registro localizado</strong></p>
       <p>${achado.nome}</p>
+      ${achado.unidade ? `<p><em>${achado.unidade}</em></p>` : ""}
       ${achado.funcao ? `<span class="badge-funcao">${achado.funcao}</span>` : ""}
-      <p style="margin-top:14px;">${achado.escala || "Servidor escalado"}</p>
-    `;
-  } else {
-    resultado.className = "resultado nao-encontrado";
-    resultado.innerHTML = `
-      <p><strong>Registro funcional não localizado</strong></p>
-      <p>Consultar a preleção ou o escalante responsável.</p>
+      <p style="margin-top:12px;">${achado.escala}</p>
     `;
   }
 
