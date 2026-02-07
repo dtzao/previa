@@ -1,91 +1,142 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#05080f" />
+
+<!-- iOS: modo “app” quando adicionado à tela inicial -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
 <title>Consulta de Escala Operacional – PMESP</title>
 
 <style>
 * { box-sizing: border-box; }
 
-body {
-  margin: 0;
-  background: linear-gradient(180deg, #0b1a2d, #05080f);
-  font-family: "Inter", "Segoe UI", Arial, sans-serif;
-  color: #e5e7eb;
+:root{
+  --bg1:#0b1a2d;
+  --bg2:#05080f;
+  --card:#0f172a;
+  --stroke:#1f2937;
+  --primary:#2563eb;
+  --primary2:#1d4ed8;
+  --text:#e5e7eb;
+  --muted:#9ca3af;
 }
 
+/* ajuda a evitar zoom automático em iOS */
+input, button { font-size: 16px; }
+
+body {
+  margin: 0;
+  background: linear-gradient(180deg, var(--bg1), var(--bg2));
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  color: var(--text);
+  min-height: 100vh;
+  min-height: 100dvh; /* melhor no mobile */
+}
+
+/* “App frame”: centraliza e ocupa a tela */
 .container {
+  width: 100%;
   max-width: 620px;
-  margin: auto;
-  padding: 40px 18px;
+  margin: 0 auto;
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding:
+    calc(env(safe-area-inset-top) + 18px)
+    calc(env(safe-area-inset-right) + 16px)
+    calc(env(safe-area-inset-bottom) + 18px)
+    calc(env(safe-area-inset-left) + 16px);
+
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 14px;
   text-align: center;
 }
 
-header { margin-bottom: 30px; }
+header { margin-top: 6px; }
 
 header h1 {
   font-size: 22px;
-  font-weight: 600;
+  font-weight: 650;
   color: #3b82f6;
-  margin-bottom: 6px;
+  margin: 0 0 6px 0;
+  letter-spacing: .2px;
 }
 
 header h2 {
   font-size: 14px;
   font-weight: 400;
-  color: #9ca3af;
+  color: var(--muted);
+  margin: 0;
+}
+
+/* bloco principal (input + botão) com “cara de app” */
+.panel {
+  margin-top: 8px;
+  background: rgba(15, 23, 42, .55);
+  border: 1px solid rgba(31, 41, 55, .75);
+  border-radius: 18px;
+  padding: 14px;
+  backdrop-filter: blur(10px);
 }
 
 input {
   width: 100%;
-  padding: 15px;
-  font-size: 17px;
-  border-radius: 10px;
-  border: 1px solid #1f2937;
+  padding: 14px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--stroke);
   background: #0f172a;
   color: #fff;
   text-align: center;
+  outline: none;
+}
+
+input:focus {
+  border-color: rgba(37,99,235,.9);
+  box-shadow: 0 0 0 4px rgba(37,99,235,.18);
 }
 
 button {
   width: 100%;
-  margin-top: 16px;
-  padding: 15px;
-  font-size: 16px;
-  border-radius: 10px;
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 12px;
   border: none;
-  background: #2563eb;
+  background: var(--primary);
   color: #fff;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
-button:hover { background: #1d4ed8; }
+button:hover { background: var(--primary2); }
 button:disabled { opacity: .6; cursor: not-allowed; }
 
 .resultado {
-  margin-top: 28px;
-  padding: 22px;
-  border-radius: 12px;
+  margin-top: 12px;
+  padding: 18px;
+  border-radius: 16px;
   display: none;
   text-align: left;
 }
 
 .encontrado {
   background: rgba(37,99,235,0.12);
-  border: 1px solid #2563eb;
+  border: 1px solid rgba(37,99,235,.95);
 }
 
 .nao-encontrado {
   background: rgba(220,38,38,0.12);
-  border: 1px solid #dc2626;
+  border: 1px solid rgba(220,38,38,.95);
 }
 
 .resultado p {
   margin: 0;
   font-size: 15px;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .resultado p + p { margin-top: 10px; }
@@ -95,7 +146,7 @@ button:disabled { opacity: .6; cursor: not-allowed; }
   margin-top: 6px;
   padding: 4px 10px;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   border-radius: 999px;
   background: rgba(59,130,246,0.15);
   border: 1px solid #3b82f6;
@@ -103,9 +154,20 @@ button:disabled { opacity: .6; cursor: not-allowed; }
 }
 
 footer {
-  margin-top: 45px;
+  margin-top: auto; /* empurra para o fim da tela (app feel) */
+  padding-top: 10px;
   font-size: 11px;
-  color: #9ca3af;
+  color: var(--muted);
+  opacity: .95;
+}
+
+/* Ajustes mobile: tudo mais compacto e “na tela” */
+@media (max-width: 480px) {
+  header h1 { font-size: 20px; }
+  header h2 { font-size: 13px; }
+  .container { gap: 12px; }
+  .panel { padding: 12px; border-radius: 16px; }
+  .resultado { padding: 16px; border-radius: 14px; }
 }
 </style>
 </head>
@@ -113,19 +175,21 @@ footer {
 <body>
 <div class="container">
 
-<header>
-  <h1>Polícia Militar do Estado de São Paulo</h1>
-  <h2>Diretoria de Pessoal · Consulta de Escala Operacional</h2>
-</header>
+  <header>
+    <h1>Polícia Militar do Estado de São Paulo</h1>
+    <h2>Diretoria de Pessoal · Consulta de Escala Operacional</h2>
+  </header>
 
-<input id="reInput" placeholder="Informe o Registro Funcional (RE)" inputmode="numeric">
-<button id="btnConsultar" onclick="consultar()">Consultar Escala</button>
-<div id="resultado" class="resultado"></div>
+  <div class="panel">
+    <input id="reInput" placeholder="Informe o Registro Funcional (RE)" inputmode="numeric" />
+    <button id="btnConsultar" onclick="consultar()">Consultar Escala</button>
+    <div id="resultado" class="resultado"></div>
+  </div>
 
-<footer>
-Sistema de apoio administrativo – Uso interno<br>
-Desenvolvimento: Sd PM 154.466-7 Anderson Silva
-</footer>
+  <footer>
+    Sistema de apoio administrativo – Uso interno<br />
+    Desenvolvimento: Sd PM 154.466-7 Anderson Silva
+  </footer>
 
 </div>
 
@@ -140,14 +204,12 @@ input.addEventListener("input", () => {
   input.value = input.value.replace(/\D/g, "");
 });
 
-// Enter para consultar
 input.addEventListener("keydown", (e) => {
   if (e.key === "Enter") consultar();
 });
 
 function normalizarRE(v) { return (v || "").replace(/\D/g, ""); }
 
-/** CSV parser com aspas */
 function parseCSV(text, delimiter) {
   const rows = [];
   let row = [];
@@ -185,7 +247,6 @@ function parseCSV(text, delimiter) {
   return rows;
 }
 
-/** Detecta separador entre ; e , pela primeira linha não-vazia */
 function detectarSeparador(csvText) {
   const firstLine = (csvText.split(/\r?\n/).find(l => l.trim().length) || "");
   const sc = (firstLine.match(/;/g) || []).length;
@@ -193,7 +254,6 @@ function detectarSeparador(csvText) {
   return (sc > cc) ? ";" : ",";
 }
 
-/** Corrige “palavras coladas” em pontos críticos (ex.: TATIANEFOLGA => TATIANE FOLGA) */
 function descolarPalavrasCriticas(t) {
   if (!t) return "";
   t = String(t).toUpperCase();
@@ -213,51 +273,39 @@ function descolarPalavrasCriticas(t) {
   return t.replace(/\s+/g, " ").trim();
 }
 
-/** ✅ evita “escala contaminada” com dados de outro policial */
 function pareceLinhaDePessoa(s) {
   if (!s) return false;
   const t = String(s).toUpperCase();
-
   const temRE = /\b\d{3}\.?\d{3}-?\d\b/.test(t);
   const temPostoPM =
     /\b(SD|CB|SUB\s*TEN|1º\s*SGT|2º\s*SGT|3º\s*SGT)\b/.test(t) && /\bPM\b/.test(t);
-
   return temRE || temPostoPM;
 }
 
 function pareceEscala(s) {
   if (!s) return false;
   const t = String(s).toUpperCase().replace(/\s+/g, " ").trim();
-
   if (pareceLinhaDePessoa(t)) return false;
 
-  // palavras típicas de escala/serviço (pode ajustar)
   const chaves = [
     "FOLGA","MENSAL","REF","ESCALA","PLANT","TURNO",
     "EQ","EQUIPE","DIUR","NOT","12X","24X","ADMIN","EXPED"
   ];
-
   return chaves.some(k => t.includes(k));
 }
 
 function limparEscala(s) {
   if (!s) return "";
   let t = String(s).toUpperCase();
-
-  // remove qualquer trecho com “posto + PM + RE ...” caso venha colado na escala
   t = t.replace(/\b(SD|CB|SUB\s*TEN|1º\s*SGT|2º\s*SGT|3º\s*SGT)\s*PM\s*\d{3}\.?\d{3}-?\d\b.*$/g, "").trim();
-
   t = t.replace(/\s+/g, " ").trim();
   return t;
 }
 
-/* 🔹 CLASSIFICAÇÃO PMESP (mantendo sua lógica, só mais “blindada”) */
 function separarDados(texto) {
   let t = (texto || "").toUpperCase();
-
   t = descolarPalavrasCriticas(t);
 
-  /* 1) NORMALIZA SIGLAS COLADAS */
   const siglas = [
     "SUB TEN PM","1º SGT PM","2º SGT PM","3º SGT PM","CB PM","SD PM",
     "BPM/M","CIA","CICC","CPAM","CPA","RPM",
@@ -272,7 +320,6 @@ function separarDados(texto) {
 
   t = t.replace(/\s+/g, " ").trim();
 
-  /* 2) POSTO / GRADUAÇÃO */
   let grad = "";
   const postos = ["SUB TEN PM","1º SGT PM","2º SGT PM","3º SGT PM","CB PM","SD PM"];
   for (let p of postos) {
@@ -283,7 +330,6 @@ function separarDados(texto) {
     }
   }
 
-  /* 3) FUNÇÃO */
   let funcao = "";
   const funcoes = ["ENCARREGADO","CGP","AUX","MOT","VTR","CICC"];
   for (let f of funcoes) {
@@ -294,7 +340,6 @@ function separarDados(texto) {
     }
   }
 
-  /* 4) UNIDADE */
   let unidade = "";
   const mBpm = t.match(/(\d+º?\s*BPM\/M|\d+º?\s*BPM)/i);
   if (mBpm) {
@@ -311,14 +356,9 @@ function separarDados(texto) {
     }
   }
 
-  /* 5) NOME (o que sobrou) */
   t = t.replace(/,+/g,"").replace(/\s+/g," ").trim();
 
-  return {
-    nome: `${grad} ${t}`.trim(),
-    unidade,
-    funcao
-  };
+  return { nome: `${grad} ${t}`.trim(), unidade, funcao };
 }
 
 let registros = [];
@@ -353,7 +393,6 @@ async function carregarBase() {
     for (const row of rows) {
       const cols = row.map(c => (c || "").replace(/"/g,"").trim());
 
-      // ✅ mantém a lógica do cols[3], mas só aceita se “parecer escala”
       if (cols[3] && pareceEscala(cols[3])) {
         escalaAtual = cols[3];
       }
@@ -369,7 +408,6 @@ async function carregarBase() {
 
       let limpo = texto.replace(m[0], " ");
 
-      // remove escalaAtual do corpo, se existir
       if (escalaAtual) {
         const esc = String(escalaAtual).toUpperCase().replace(/\s+/g, " ").trim();
         const escRe = new RegExp(esc.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
@@ -385,7 +423,6 @@ async function carregarBase() {
         re,
         reBase: re.slice(0,-1),
         ...dados,
-        // ✅ garante que nunca apareça “SD PM 240...” na escala
         escala: limparEscala(escalaAtual)
       });
     }
@@ -393,7 +430,9 @@ async function carregarBase() {
     carregado = true;
     btn.disabled = false;
 
-    setStatus("encontrado", `<p><strong>Base carregada</strong></p><p>${registros.length} registros disponíveis.</p>`);
+    // opcional: feedback de pronto
+    // setStatus("encontrado", `<p><strong>Base carregada</strong></p><p>${registros.length} registros disponíveis.</p>`);
+    resultado.style.display = "none";
   } catch (e) {
     btn.disabled = true;
     setStatus("nao-encontrado", `<p><strong>Falha ao carregar a base</strong></p><p>${String(e.message || e)}</p>`);
@@ -429,7 +468,6 @@ function consultar() {
   }
 }
 
-// inicia carregando ao abrir
 carregarBase();
 </script>
 
