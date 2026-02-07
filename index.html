@@ -150,54 +150,60 @@ function normalizarRE(v) {
 
 /* 🔹 CLASSIFICAÇÃO PMESP */
 function separarDados(texto) {
-  let t = texto;
+  let t = texto.toUpperCase();
 
-  const posto = [
+  /* 🔧 1. NORMALIZA SIGLAS COLADAS */
+  const siglas = [
+    "SUB TEN PM","1º SGT PM","2º SGT PM","3º SGT PM","CB PM","SD PM",
+    "BPM/M","BPM","CIA","CICC","CPAM","CPA","RPM",
+    "ENCARREGADO","CGP","AUX","MOT","VTR"
+  ];
+
+  // força espaço antes e depois das siglas
+  siglas.forEach(s => {
+    const r = new RegExp(s.replace(/\//g,"\\/"), "g");
+    t = t.replace(r, " " + s + " ");
+  });
+
+  // limpa excesso de espaço
+  t = t.replace(/\s+/g, " ").trim();
+
+  /* 🔹 2. POSTO / GRADUAÇÃO */
+  let grad = "";
+  const postos = [
     "SUB TEN PM","1º SGT PM","2º SGT PM","3º SGT PM","CB PM","SD PM"
   ];
-
-  const unidades = [
-    /\d+º?\s*BPM\/M/i,
-    /\d+º?\s*BPM/i,
-    /\bCIA\b/i,
-    /\bCICC\b/i,
-    /\bCPAM\b/i,
-    /\bCPA\b/i,
-    /\bRPM\b/i
-  ];
-
-  const funcoes = [
-    "ENCARREGADO","CGP","AUX","MOT","VTR","CICC"
-  ];
-
-  let grad = "", unidade = "", funcao = "";
-
-  for (let p of posto) {
+  for (let p of postos) {
     if (t.includes(p)) {
       grad = p;
-      t = t.replace(p, "").trim();
+      t = t.replace(p,"").trim();
       break;
     }
   }
 
-  for (let u of unidades) {
-    const m = t.match(u);
-    if (m) {
-      unidade = m[0];
-      t = t.replace(m[0], "").trim();
-      break;
-    }
-  }
-
+  /* 🔹 3. FUNÇÃO */
+  let funcao = "";
+  const funcoes = ["ENCARREGADO","CGP","AUX","MOT","VTR","CICC"];
   for (let f of funcoes) {
-    const r = new RegExp(f + "$","i");
-    if (r.test(t)) {
+    if (t.endsWith(f)) {
       funcao = f;
-      t = t.replace(r,"").trim();
+      t = t.replace(f,"").trim();
       break;
     }
   }
 
+  /* 🔹 4. UNIDADE */
+  let unidade = "";
+  const unidades = ["BPM/M","BPM","CIA","CICC","CPAM","CPA","RPM"];
+  for (let u of unidades) {
+    if (t.includes(u)) {
+      unidade = u;
+      t = t.replace(u,"").trim();
+      break;
+    }
+  }
+
+  /* 🔹 5. NOME (o que sobrou) */
   t = t.replace(/,+/g,"").replace(/\s+/g," ").trim();
 
   return {
@@ -272,3 +278,4 @@ function consultar() {
 
 </body>
 </html>
+
