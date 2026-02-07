@@ -193,15 +193,25 @@ function separarDados(texto) {
   }
 
   /* 🔹 4. UNIDADE */
-  let unidade = "";
-  const unidades = ["BPM/M","BPM","CIA","CICC","CPAM","CPA","RPM"];
-  for (let u of unidades) {
+  /* 🔹 UNIDADE (sempre com número) */
+let unidade = "";
+
+// BPM ou BPM/M com número
+const mBpm = t.match(/\d+º?\s*BPM\/M|\d+º?\s*BPM/i);
+if (mBpm) {
+  unidade = mBpm[0];
+  t = t.replace(mBpm[0], "").trim();
+} else {
+  // demais unidades sem número
+  const outras = ["CIA","CICC","CPAM","CPA","RPM"];
+  for (let u of outras) {
     if (t.includes(u)) {
       unidade = u;
       t = t.replace(u,"").trim();
       break;
     }
   }
+}
 
   /* 🔹 5. NOME (o que sobrou) */
   t = t.replace(/,+/g,"").replace(/\s+/g," ").trim();
@@ -278,4 +288,5 @@ function consultar() {
 
 </body>
 </html>
+
 
