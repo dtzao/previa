@@ -92,11 +92,24 @@ button:hover {
 }
 
 .resultado p + p {
-  margin-top: 14px;
+  margin-top: 12px;
 }
 
 .resultado strong {
   color: #93c5fd;
+}
+
+/* 🔵 BADGE DA FUNÇÃO */
+.badge-funcao {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: rgba(59,130,246,0.15);
+  border: 1px solid #3b82f6;
+  color: #bfdbfe;
 }
 
 footer {
@@ -148,15 +161,37 @@ function normalizarRE(txt) {
   return (txt || "").replace(/\D/g, "");
 }
 
-function limparNome(txt) {
-  return txt
+/* 🔒 Separação robusta Nome / Função */
+function separarNomeEFunção(texto) {
+  const funcoes = [
+    "MOT", "VTR", "ENCARREGADO", "CGP", "AUX",
+    "APOIO", "RPM", "SUPERVISOR", "PATRULHA", "VIATURA"
+  ];
+
+  let nome = texto;
+  let funcao = "";
+
+  for (let f of funcoes) {
+    const r = new RegExp("\\b" + f + "\\b.*", "i");
+    if (r.test(texto)) {
+      funcao = texto.match(r)[0].trim();
+      nome = texto.replace(r, "").trim();
+      break;
+    }
+  }
+
+  nome = nome
     .replace(/,+/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  return { nome, funcao };
 }
 
 let registros = [];
+const reIndex = new Set();
 
+/* 🛡️ BLINDAGEM DO CSV */
 fetch(CSV_URL)
   .then(r => r.text())
   .then(csv => {
@@ -165,31 +200,37 @@ fetch(CSV_URL)
     let escalaAtual = "";
 
     for (let linha of linhas) {
-      if (!linha) continue;
+      if (!linha || linha.trim().length < 5) continue;
 
-      const colunas = linha.split(";").map(c => c.replace(/"/g, "").trim());
+      const colunas = linha.split(";").map(c =>
+        c.replace(/"/g, "").trim()
+      );
+
       const textoLinha = colunas.join(" ");
 
-      // Detecta escala
       if (colunas[3] && colunas[3].length > 2) {
         escalaAtual = colunas[3];
       }
 
       const matchRE = textoLinha.match(/\d{3}\.?\d{3}-?\d/);
+      if (!matchRE) continue;
 
-      if (matchRE) {
-        let nomeLimpo = textoLinha;
+      const reCompleto = normalizarRE(matchRE[0]);
+      if (reIndex.has(reCompleto)) continue;
+      reIndex.add(reCompleto);
 
-        if (escalaAtual) {
-          nomeLimpo = nomeLimpo.replace(escalaAtual, "");
-        }
+      let textoLimpo = textoLinha.replace(matchRE[0], "");
+      if (escalaAtual) textoLimpo = textoLimpo.replace(escalaAtual, "");
 
-        registros.push({
-          re: normalizarRE(matchRE[0]),
-          nome: limparNome(nomeLimpo),
-          escala: escalaAtual || ""
-        });
-      }
+      const dados = separarNomeEFunção(textoLimpo);
+
+      registros.push({
+        re: reCompleto,
+        reBase: reCompleto.slice(0, -1),
+        nome: dados.nome,
+        funcao: dados.funcao,
+        escala: escalaAtual || ""
+      });
     }
   });
 
@@ -197,29 +238,26 @@ function consultar() {
   const reBusca = normalizarRE(input.value);
   resultado.style.display = "none";
 
-  if (reBusca.length < 7) {
+  if (reBusca.length < 6) {
     resultado.className = "resultado nao-encontrado";
     resultado.innerHTML =
-      "<p><strong>Atenção:</strong><br>Informe o RE completo, incluindo o dígito.</p>";
+      "<p><strong>Atenção:</strong><br>Informe o RE corretamente.</p>";
     resultado.style.display = "block";
     return;
   }
 
-  const achado = registros.find(r => r.re === reBusca);
+  const achado = registros.find(r =>
+    r.re === reBusca || r.reBase === reBusca
+  );
 
   if (achado) {
-  resultado.className = "resultado encontrado";
-
-  // Quebra o nome em partes
-  const partesNome = achado.nome.split(/\s{2,}|(?=ENCARREGADO|VTR)/);
-
-  resultado.innerHTML = `
-    <p><strong>Registro localizado</strong></p>
-
-    <p>${partesNome[0] || ""}</p>
-    <p>${partesNome[1] || ""}</p>
-    <p>${achado.escala || "Servidor escalado"}</p>
-  `;
+    resultado.className = "resultado encontrado";
+    resultado.innerHTML = `
+      <p><strong>Registro localizado</strong></p>
+      <p>${achado.nome}</p>
+      ${achado.funcao ? `<span class="badge-funcao">${achado.funcao}</span>` : ""}
+      <p style="margin-top:14px;">${achado.escala || "Servidor escalado"}</p>
+    `;
   } else {
     resultado.className = "resultado nao-encontrado";
     resultado.innerHTML = `
@@ -234,4 +272,3 @@ function consultar() {
 
 </body>
 </html>
-
